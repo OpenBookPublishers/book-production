@@ -1,0 +1,195 @@
+name: book-production
+run-name: book-production for ${{ github.event.inputs.doi }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      doi:
+        description: 'DOI of book (last four digits only)'
+        required: true
+        type: number
+
+env:
+  DOI: ${{ github.event.inputs.doi }}
+  WORK_DIR: /ebook_automation/
+  OUT_DIR: /ebook_automation/output/
+
+jobs:
+
+  download-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy PDF from S3
+        run: |
+          aws s3 cp ${{ secrets.S3_URL }}obp.${{ env.DOI }}.pdf .
+      - name: Save PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-pdf
+          path: obp.${{ env.DOI }}.pdf
+          retention-days: 10
+          if-no-files-found: error
+          overwrite: true
+
+  download-epub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy EPUB from S3
+        run: |
+          aws s3 cp ${{ secrets.S3_URL }}obp.${{ env.DOI }}.epub .
+      - name: Save EPUB
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-epub
+          path: obp.${{ env.DOI }}.epub
+          retention-days: 10
+          if-no-files-found: error
+          overwrite: true
+
+  archive-pdf-urls:
+    needs: download-pdf
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install archive-pdf-urls
+        # https://github.com/thoth-pub/archive-pdf-urls
+        run: cargo install archive-pdf-urls
+      - name: Retrieve PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: original-pdf
+      - name: Run archive-pdf-urls Rust script
+        run: archive-pdf-urls obp.${{ env.DOI }}.pdf --exclude https://doi.org/10.11647/OBP.${{ env.DOI }}\*
+
+  chapter-splitter:
+    needs: download-pdf
+    runs-on: ubuntu-latest
+    container:
+      image: openbookpublishers/chapter-splitter
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: original-pdf
+          path: ${{ env.WORK_DIR }}
+      - name: Create Output Folder
+        run: mkdir ${{ env.OUT_DIR }}
+      - name: Run Python Command
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          python3 main.py \
+          --input-file obp.${{ env.DOI }}.pdf \
+          --output-folder ${{ env.OUT_DIR }} \
+          --write-urls \
+          10.11647/obp.${{ env.DOI }}
+        env:
+          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
+          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+      - name: Save Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: chapters
+          path: ${{ env.OUT_DIR }}
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+  epublius:
+    needs: download-epub
+    runs-on: ubuntu-latest
+    container:
+      image: openbookpublishers/epublius
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: original-epub
+          path: ${{ env.WORK_DIR }}
+      - name: Create Output Folder
+        run: mkdir ${{ env.OUT_DIR }}
+      - name: Run Python Command
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          ./thoth_wrapper.py obp.${{ env.DOI }}.epub \
+                             --doi 10.11647/obp.${{ env.DOI }}
+        env:
+          MATHJAX: 'False'
+          PRIVACYPOLICY_URL: 'https://www.openbookpublishers.com/policies/privacy/'
+          OUTDIR: ${{ env.OUT_DIR }}
+          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
+          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+      - name: Save Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: HTML
+          path: ${{ env.OUT_DIR }}/10.11647/
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+  upload-chapters:
+    needs: chapter-splitter
+    runs-on: ubuntu-latest
+    env:
+      CHAPTERS_DIR: ./chapters
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: chapters
+          path: ${{ env.CHAPTERS_DIR }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy Chapter PDFs to S3
+        run: |
+          aws s3 cp ${{ env.CHAPTERS_DIR }} ${{ secrets.S3_URL }} --recursive
+
+  upload-html:
+    needs: epublius
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: HTML
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy HTML Edition to S3
+        run: |
+          aws s3 cp ./obp.${{ env.DOI }}/ ${{ secrets.S3_URL }}obp.${{ env.DOI }}/ --recursive
+
+  cit-ex-obp-loader:
+    needs: [upload-chapters, upload-html]
+    runs-on: ubuntu-latest
+    container:
+      image: openbookpublishers/cit-ex-obp-loader
+    env:
+      WORK_DIR: /home/obp/cit-ex/
+    steps:
+      - name: Run Python Command
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          python3 obp-loader.py 10.11647/obp.${{ env.DOI }}
+        env:
+          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
+          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+
