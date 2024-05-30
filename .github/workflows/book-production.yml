@@ -1,5 +1,5 @@
 name: book-production
-run-name: book-production for ${{ github.event.inputs.doi }}
+run-name: book-production for ${{ inputs.doi }}
 
 on:
   workflow_dispatch:
@@ -15,7 +15,6 @@ on:
         type: boolean
 
 env:
-  DOI: ${{ github.event.inputs.doi }}
   WORK_DIR: /ebook_automation/
   OUT_DIR: /ebook_automation/output/
 
@@ -32,12 +31,12 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Copy PDF from S3
         run: |
-          aws s3 cp ${{ secrets.S3_URL }}obp.${{ env.DOI }}.pdf .
+          aws s3 cp ${{ secrets.S3_URL }}obp.${{ inputs.doi }}.pdf .
       - name: Save PDF
         uses: actions/upload-artifact@v4
         with:
           name: original-pdf
-          path: obp.${{ env.DOI }}.pdf
+          path: obp.${{ inputs.doi }}.pdf
           retention-days: 10
           if-no-files-found: error
           overwrite: true
@@ -54,12 +53,12 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Copy EPUB from S3
         run: |
-          aws s3 cp ${{ secrets.S3_URL }}obp.${{ env.DOI }}.epub .
+          aws s3 cp ${{ secrets.S3_URL }}obp.${{ inputs.doi }}.epub .
       - name: Save EPUB
         uses: actions/upload-artifact@v4
         with:
           name: original-epub
-          path: obp.${{ env.DOI }}.epub
+          path: obp.${{ inputs.doi }}.epub
           retention-days: 10
           if-no-files-found: error
           overwrite: true
@@ -76,7 +75,7 @@ jobs:
         with:
           name: original-pdf
       - name: Run archive-pdf-urls Rust script
-        run: archive-pdf-urls obp.${{ env.DOI }}.pdf --exclude https://doi.org/10.11647/OBP.${{ env.DOI }}\*
+        run: archive-pdf-urls obp.${{ inputs.doi }}.pdf --exclude https://doi.org/10.11647/OBP.${{ inputs.doi }}\*
 
   chapter-splitter:
     needs: download-pdf
@@ -95,10 +94,10 @@ jobs:
         working-directory: ${{ env.WORK_DIR }}
         run: |
           python3 main.py \
-          --input-file obp.${{ env.DOI }}.pdf \
+          --input-file obp.${{ inputs.doi }}.pdf \
           --output-folder ${{ env.OUT_DIR }} \
           --write-urls \
-          10.11647/obp.${{ env.DOI }}
+          10.11647/obp.${{ inputs.doi }}
         env:
           THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
           THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
@@ -127,8 +126,8 @@ jobs:
       - name: Run Python Command
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          ./thoth_wrapper.py obp.${{ env.DOI }}.epub \
-                             --doi 10.11647/obp.${{ env.DOI }}
+          ./thoth_wrapper.py obp.${{ inputs.doi }}.epub \
+                             --doi 10.11647/obp.${{ inputs.doi }}
         env:
           MATHJAX: 'False'
           PRIVACYPOLICY_URL: 'https://www.openbookpublishers.com/policies/privacy/'
@@ -181,7 +180,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Copy HTML Edition to S3
         run: |
-          aws s3 cp ./obp.${{ env.DOI }}/ ${{ secrets.S3_URL }}obp.${{ env.DOI }}/ --recursive
+          aws s3 cp ./obp.${{ inputs.doi }}/ ${{ secrets.S3_URL }}obp.${{ inputs.doi }}/ --recursive
 
   cit-ex-obp-loader:
     needs: [upload-chapters, upload-html]
@@ -194,7 +193,7 @@ jobs:
       - name: Run Python Command
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          python3 obp-loader.py 10.11647/obp.${{ env.DOI }}
+          python3 obp-loader.py 10.11647/obp.${{ inputs.doi }}
         env:
           THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
           THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
