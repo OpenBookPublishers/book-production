@@ -9,7 +9,7 @@ on:
         required: true
         type: number
       has_epub:
-        description: 'True to run EPUB workflow'
+        description: 'Run EPUB workflow'
         default: true
         required: true
         type: boolean
