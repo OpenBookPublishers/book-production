@@ -8,6 +8,11 @@ on:
         description: 'DOI of book (last four digits only)'
         required: true
         type: number
+      has_pdf:
+        description: 'Run PDF workflow'
+        default: true
+        required: true
+        type: boolean
       has_epub:
         description: 'Run EPUB workflow'
         default: true
@@ -22,6 +27,7 @@ jobs:
 
   download-pdf:
     runs-on: ubuntu-latest
+    if: ${{ inputs.has_pdf }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
