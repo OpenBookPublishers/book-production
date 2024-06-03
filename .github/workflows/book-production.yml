@@ -189,7 +189,7 @@ jobs:
           aws s3 cp ./obp.${{ inputs.doi }}/ ${{ secrets.S3_URL }}obp.${{ inputs.doi }}/ --recursive
 
   cit-ex-obp-loader:
-    needs: [upload-chapters, upload-html]
+    needs: upload-html
     runs-on: ubuntu-latest
     container:
       image: openbookpublishers/cit-ex-obp-loader
