@@ -22,6 +22,7 @@ on:
 env:
   WORK_DIR: /ebook_automation/
   OUT_DIR: /ebook_automation/output/
+  WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
 
@@ -203,4 +204,63 @@ jobs:
         env:
           THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
           THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+
+  status:
+    runs-on: ubuntu-latest
+    needs: [upload-chapters, cit-ex-obp-loader]
+    if: always()
+    steps:
+      - name: Set up job status summary
+        id: generate_summary
+        run: |
+          get_status_emoji() {
+            local status=$1
+            if [ "$status" == "success" ]; then
+              echo ":large_green_circle:"
+            elif [ "$status" == "failure" ]; then
+              echo ":red_circle:"
+            else
+              echo ":white_circle:"
+            fi
+          }
+
+          PDF_WORKFLOW_STATUS=${{ needs.upload-chapters.result }}
+          EPUB_WORKFLOW_STATUS=${{ needs.cit-ex-obp-loader.result }}
+
+          echo "|   | Job | Status |" > summary.md
+          echo "| - | --- | ------ |" >> summary.md
+          echo "| $(get_status_emoji $PDF_WORKFLOW_STATUS) | PDF workflow | $PDF_WORKFLOW_STATUS |" >> summary.md
+          echo "| $(get_status_emoji $EPUB_WORKFLOW_STATUS) | EPUB workflow | $EPUB_WORKFLOW_STATUS |" >> summary.md
+
+      - name: Write summary to GITHUB_STEP_SUMMARY
+        run: cat summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Read summary into environment variable
+        id: summary
+        run: |
+          echo "SUMMARY<<EOF" >> $GITHUB_ENV
+          cat summary.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Send notification to Mattermost
+        uses: mattermost/action-mattermost-notify@master
+        with:
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_WEBHOOK_URL }}
+          TEXT: |
+            #### Book production workflow for ${{ inputs.doi }}
+            @channel please review the [workflow run](${{ env.WORKFLOW_URL }}).
+
+            ${{ env.SUMMARY }}
+
+  report-pdf-archiving-failure:
+    runs-on: ubuntu-latest
+    needs: archive-pdf-urls
+    if: failure()
+    steps:
+      - uses: mattermost/action-mattermost-notify@master
+        with:
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_WEBHOOK_URL }}
+          TEXT: |
+            #### :red_circle: Archive PDF URLs for ${{inputs.doi}} has failed
+            @channel please review the [workflow run](${{ env.WORKFLOW_URL }})
 
