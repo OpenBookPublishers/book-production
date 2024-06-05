@@ -224,13 +224,35 @@ jobs:
             fi
           }
 
-          PDF_WORKFLOW_STATUS=${{ needs.upload-chapters.result }}
-          EPUB_WORKFLOW_STATUS=${{ needs.cit-ex-obp-loader.result }}
+          overall_status() {
+            local statuses=("$@")
+            local overall="success"
+            local all_skipped_or_cancelled=true
 
-          echo "|   | Job | Status |" > summary.md
-          echo "| - | --- | ------ |" >> summary.md
-          echo "| $(get_status_emoji $PDF_WORKFLOW_STATUS) | PDF workflow | $PDF_WORKFLOW_STATUS |" >> summary.md
-          echo "| $(get_status_emoji $EPUB_WORKFLOW_STATUS) | EPUB workflow | $EPUB_WORKFLOW_STATUS |" >> summary.md
+            for status in "${statuses[@]}"; do
+              if [ "$status" == "failure" ]; then
+                overall="failure"
+                all_skipped_or_cancelled=false
+                break
+              elif [ "$status" == "success" ]; then
+                all_skipped_or_cancelled=false
+              fi
+            done
+
+            if [ "$all_skipped_or_cancelled" = true ]; then
+              overall="skipped"
+            fi
+
+            echo $overall
+          }
+
+          PDF_WORKFLOW_STATUS=$(overall_status "${{ needs.download-pdf.result }}" "${{ needs.chapter-splitter.result }}" "${{ needs.upload-chapters.result }}")
+          EPUB_WORKFLOW_STATUS=$(overall_status "${{ needs.download-epub.result }}" "${{ needs.epublius.result }}" "${{ needs.upload-html.result }}" "${{ needs.cit-ex-obp-loader.result }}")
+
+          echo "| Workflow | Status |   |" >> summary.md
+          echo "| -------- | ------ | - |" >> summary.md
+          echo "| PDF Workflow | $PDF_WORKFLOW_STATUS | $(get_status_emoji $PDF_WORKFLOW_STATUS) |" >> summary.md
+          echo "| EPUB Workflow | $EPUB_WORKFLOW_STATUS | $(get_status_emoji $EPUB_WORKFLOW_STATUS) |" >> summary.md
 
       - name: Write summary to GITHUB_STEP_SUMMARY
         run: cat summary.md >> $GITHUB_STEP_SUMMARY
