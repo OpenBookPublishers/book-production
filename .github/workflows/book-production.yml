@@ -18,6 +18,11 @@ on:
         default: true
         required: true
         type: boolean
+      run_archive:
+        description: 'Run URL archiving'
+        default: true
+        required: true
+        type: boolean
 
 env:
   WORK_DIR: /ebook_automation/
@@ -28,7 +33,7 @@ jobs:
 
   download-pdf:
     runs-on: ubuntu-latest
-    if: ${{ inputs.has_pdf }}
+    if: ${{ inputs.has_pdf || inputs.run_archive }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -73,6 +78,7 @@ jobs:
   archive-pdf-urls:
     needs: download-pdf
     runs-on: ubuntu-latest
+    if: ${{ inputs.run_archive }}
     steps:
       - name: Install archive-pdf-urls
         # https://github.com/thoth-pub/archive-pdf-urls
@@ -87,6 +93,7 @@ jobs:
   chapter-splitter:
     needs: download-pdf
     runs-on: ubuntu-latest
+    if: ${{ inputs.has_pdf }}
     container:
       image: openbookpublishers/chapter-splitter
     steps:
