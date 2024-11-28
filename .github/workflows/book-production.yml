@@ -23,6 +23,11 @@ on:
         default: true
         required: true
         type: boolean
+      copyright_page:
+        description: 'Copyright page number (default is 4, first page is 0)'
+        default: 4
+        required: true
+        type: number
 
 env:
   WORK_DIR: /ebook_automation/
@@ -115,6 +120,7 @@ jobs:
         env:
           THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
           THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+          COPYRIGHT_PAGE: ${{ inputs.copyright_page }}
       - name: Save Data
         uses: actions/upload-artifact@v4
         with:
