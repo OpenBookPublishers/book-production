@@ -58,42 +58,42 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-  # download-epub:
-  #   runs-on: ubuntu-latest
-  #   if: ${{ inputs.has_epub }}
-  #   steps:
-  #     - name: Configure AWS credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #         aws-region: ${{ secrets.AWS_REGION }}
-  #     - name: Copy EPUB from S3
-  #       run: |
-  #         aws s3 cp ${{ secrets.S3_URL }}obp.${{ inputs.doi }}.epub .
-  #     - name: Save EPUB
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: original-epub
-  #         path: obp.${{ inputs.doi }}.epub
-  #         retention-days: 10
-  #         if-no-files-found: error
-  #         overwrite: true
+  download-epub:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.has_epub }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy EPUB from S3
+        run: |
+          aws s3 cp ${{ secrets.S3_URL }}obp.${{ inputs.doi }}.epub .
+      - name: Save EPUB
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-epub
+          path: obp.${{ inputs.doi }}.epub
+          retention-days: 10
+          if-no-files-found: error
+          overwrite: true
 
-  # archive-pdf-urls:
-  #   needs: download-pdf
-  #   runs-on: ubuntu-latest
-  #   if: ${{ inputs.run_archive }}
-  #   steps:
-  #     - name: Install archive-pdf-urls
-  #       # https://github.com/thoth-pub/archive-pdf-urls
-  #       run: cargo install archive-pdf-urls
-  #     - name: Retrieve PDF
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: original-pdf
-  #     - name: Run archive-pdf-urls Rust script
-  #       run: archive-pdf-urls obp.${{ inputs.doi }}.pdf --exclude https://doi.org/10.11647/OBP.${{ inputs.doi }}\*
+  archive-pdf-urls:
+    needs: download-pdf
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run_archive }}
+    steps:
+      - name: Install archive-pdf-urls
+        # https://github.com/thoth-pub/archive-pdf-urls
+        run: cargo install archive-pdf-urls
+      - name: Retrieve PDF
+        uses: actions/download-artifact@v4
+        with:
+          name: original-pdf
+      - name: Run archive-pdf-urls Rust script
+        run: archive-pdf-urls obp.${{ inputs.doi }}.pdf --exclude https://doi.org/10.11647/OBP.${{ inputs.doi }}\*
 
   chapter-splitter:
     needs: download-pdf
@@ -130,172 +130,172 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-  # epublius:
-  #   needs: download-epub
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: openbookpublishers/epublius
-  #   steps:
-  #     - name: Retrieve Data
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: original-epub
-  #         path: ${{ env.WORK_DIR }}
-  #     - name: Create Output Folder
-  #       run: mkdir ${{ env.OUT_DIR }}
-  #     - name: Run Python Command
-  #       working-directory: ${{ env.WORK_DIR }}
-  #       run: |
-  #         ./thoth_wrapper.py obp.${{ inputs.doi }}.epub \
-  #                            --doi 10.11647/obp.${{ inputs.doi }}
-  #       env:
-  #         MATHJAX: 'False'
-  #         PRIVACYPOLICY_URL: 'https://www.openbookpublishers.com/policies/privacy/'
-  #         OUTDIR: ${{ env.OUT_DIR }}
-  #         THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
-  #         THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
-  #     - name: Save Data
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: HTML
-  #         path: ${{ env.OUT_DIR }}/10.11647/
-  #         retention-days: 1
-  #         if-no-files-found: error
-  #         overwrite: true
+  epublius:
+    needs: download-epub
+    runs-on: ubuntu-latest
+    container:
+      image: openbookpublishers/epublius
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: original-epub
+          path: ${{ env.WORK_DIR }}
+      - name: Create Output Folder
+        run: mkdir ${{ env.OUT_DIR }}
+      - name: Run Python Command
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          ./thoth_wrapper.py obp.${{ inputs.doi }}.epub \
+                             --doi 10.11647/obp.${{ inputs.doi }}
+        env:
+          MATHJAX: 'False'
+          PRIVACYPOLICY_URL: 'https://www.openbookpublishers.com/policies/privacy/'
+          OUTDIR: ${{ env.OUT_DIR }}
+          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
+          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+      - name: Save Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: HTML
+          path: ${{ env.OUT_DIR }}/10.11647/
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
 
-  # upload-chapters:
-  #   needs: chapter-splitter
-  #   runs-on: ubuntu-latest
-  #   env:
-  #     CHAPTERS_DIR: ./chapters
-  #   steps:
-  #     - name: Retrieve Data
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: chapters
-  #         path: ${{ env.CHAPTERS_DIR }}
-  #     - name: Configure AWS credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #         aws-region: ${{ secrets.AWS_REGION }}
-  #     - name: Copy Chapter PDFs to S3
-  #       run: |
-  #         aws s3 cp ${{ env.CHAPTERS_DIR }} ${{ secrets.S3_URL }} --recursive
+  upload-chapters:
+    needs: chapter-splitter
+    runs-on: ubuntu-latest
+    env:
+      CHAPTERS_DIR: ./chapters
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: chapters
+          path: ${{ env.CHAPTERS_DIR }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy Chapter PDFs to S3
+        run: |
+          aws s3 cp ${{ env.CHAPTERS_DIR }} ${{ secrets.S3_URL }} --recursive
 
-  # upload-html:
-  #   needs: epublius
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Retrieve Data
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: HTML
-  #     - name: Configure AWS credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #         aws-region: ${{ secrets.AWS_REGION }}
-  #     - name: Copy HTML Edition to S3
-  #       run: |
-  #         aws s3 cp ./obp.${{ inputs.doi }}/ ${{ secrets.S3_URL }}obp.${{ inputs.doi }}/ --recursive
+  upload-html:
+    needs: epublius
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: HTML
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy HTML Edition to S3
+        run: |
+          aws s3 cp ./obp.${{ inputs.doi }}/ ${{ secrets.S3_URL }}obp.${{ inputs.doi }}/ --recursive
 
-  # cit-ex-obp-loader:
-  #   needs: upload-html
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: openbookpublishers/cit-ex-obp-loader
-  #   env:
-  #     WORK_DIR: /home/obp/cit-ex/
-  #   steps:
-  #     - name: Run Python Command
-  #       working-directory: ${{ env.WORK_DIR }}
-  #       run: |
-  #         python3 obp-loader.py 10.11647/obp.${{ inputs.doi }}
-  #       env:
-  #         THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
-  #         THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+  cit-ex-obp-loader:
+    needs: upload-html
+    runs-on: ubuntu-latest
+    container:
+      image: openbookpublishers/cit-ex-obp-loader
+    env:
+      WORK_DIR: /home/obp/cit-ex/
+    steps:
+      - name: Run Python Command
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          python3 obp-loader.py 10.11647/obp.${{ inputs.doi }}
+        env:
+          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
+          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
 
-  # status:
-  #   runs-on: ubuntu-latest
-  #   needs: [upload-chapters, cit-ex-obp-loader]
-  #   if: always()
-  #   steps:
-  #     - name: Set up job status summary
-  #       id: generate_summary
-  #       run: |
-  #         get_status_emoji() {
-  #           local status=$1
-  #           if [ "$status" == "success" ]; then
-  #             echo ":large_green_circle:"
-  #           elif [ "$status" == "failure" ]; then
-  #             echo ":red_circle:"
-  #           else
-  #             echo ":white_circle:"
-  #           fi
-  #         }
+  status:
+    runs-on: ubuntu-latest
+    needs: [upload-chapters, cit-ex-obp-loader]
+    if: always()
+    steps:
+      - name: Set up job status summary
+        id: generate_summary
+        run: |
+          get_status_emoji() {
+            local status=$1
+            if [ "$status" == "success" ]; then
+              echo ":large_green_circle:"
+            elif [ "$status" == "failure" ]; then
+              echo ":red_circle:"
+            else
+              echo ":white_circle:"
+            fi
+          }
 
-  #         overall_status() {
-  #           local statuses=("$@")
-  #           local overall="success"
-  #           local all_skipped_or_cancelled=true
+          overall_status() {
+            local statuses=("$@")
+            local overall="success"
+            local all_skipped_or_cancelled=true
 
-  #           for status in "${statuses[@]}"; do
-  #             if [ "$status" == "failure" ]; then
-  #               overall="failure"
-  #               all_skipped_or_cancelled=false
-  #               break
-  #             elif [ "$status" == "success" ]; then
-  #               all_skipped_or_cancelled=false
-  #             fi
-  #           done
+            for status in "${statuses[@]}"; do
+              if [ "$status" == "failure" ]; then
+                overall="failure"
+                all_skipped_or_cancelled=false
+                break
+              elif [ "$status" == "success" ]; then
+                all_skipped_or_cancelled=false
+              fi
+            done
 
-  #           if [ "$all_skipped_or_cancelled" = true ]; then
-  #             overall="skipped"
-  #           fi
+            if [ "$all_skipped_or_cancelled" = true ]; then
+              overall="skipped"
+            fi
 
-  #           echo $overall
-  #         }
+            echo $overall
+          }
 
-  #         PDF_WORKFLOW_STATUS=$(overall_status "${{ needs.download-pdf.result }}" "${{ needs.chapter-splitter.result }}" "${{ needs.upload-chapters.result }}")
-  #         EPUB_WORKFLOW_STATUS=$(overall_status "${{ needs.download-epub.result }}" "${{ needs.epublius.result }}" "${{ needs.upload-html.result }}" "${{ needs.cit-ex-obp-loader.result }}")
+          PDF_WORKFLOW_STATUS=$(overall_status "${{ needs.download-pdf.result }}" "${{ needs.chapter-splitter.result }}" "${{ needs.upload-chapters.result }}")
+          EPUB_WORKFLOW_STATUS=$(overall_status "${{ needs.download-epub.result }}" "${{ needs.epublius.result }}" "${{ needs.upload-html.result }}" "${{ needs.cit-ex-obp-loader.result }}")
 
-  #         echo "| Workflow | Status |   |" >> summary.md
-  #         echo "| -------- | ------ | - |" >> summary.md
-  #         echo "| PDF Workflow | $PDF_WORKFLOW_STATUS | $(get_status_emoji $PDF_WORKFLOW_STATUS) |" >> summary.md
-  #         echo "| EPUB Workflow | $EPUB_WORKFLOW_STATUS | $(get_status_emoji $EPUB_WORKFLOW_STATUS) |" >> summary.md
+          echo "| Workflow | Status |   |" >> summary.md
+          echo "| -------- | ------ | - |" >> summary.md
+          echo "| PDF Workflow | $PDF_WORKFLOW_STATUS | $(get_status_emoji $PDF_WORKFLOW_STATUS) |" >> summary.md
+          echo "| EPUB Workflow | $EPUB_WORKFLOW_STATUS | $(get_status_emoji $EPUB_WORKFLOW_STATUS) |" >> summary.md
 
-  #     - name: Write summary to GITHUB_STEP_SUMMARY
-  #       run: cat summary.md >> $GITHUB_STEP_SUMMARY
+      - name: Write summary to GITHUB_STEP_SUMMARY
+        run: cat summary.md >> $GITHUB_STEP_SUMMARY
 
-  #     - name: Read summary into environment variable
-  #       id: summary
-  #       run: |
-  #         echo "SUMMARY<<EOF" >> $GITHUB_ENV
-  #         cat summary.md >> $GITHUB_ENV
-  #         echo "EOF" >> $GITHUB_ENV
+      - name: Read summary into environment variable
+        id: summary
+        run: |
+          echo "SUMMARY<<EOF" >> $GITHUB_ENV
+          cat summary.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-  #     - name: Send notification to Mattermost
-  #       uses: mattermost/action-mattermost-notify@master
-  #       with:
-  #         MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_WEBHOOK_URL }}
-  #         TEXT: |
-  #           #### Book production workflow for ${{ inputs.doi }}
-  #           @channel please review the [workflow run](${{ env.WORKFLOW_URL }}).
+      - name: Send notification to Mattermost
+        uses: mattermost/action-mattermost-notify@master
+        with:
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_WEBHOOK_URL }}
+          TEXT: |
+            #### Book production workflow for ${{ inputs.doi }}
+            @channel please review the [workflow run](${{ env.WORKFLOW_URL }}).
 
-  #           ${{ env.SUMMARY }}
+            ${{ env.SUMMARY }}
 
-  # report-pdf-archiving-failure:
-  #   runs-on: ubuntu-latest
-  #   needs: archive-pdf-urls
-  #   if: failure()
-  #   steps:
-  #     - uses: mattermost/action-mattermost-notify@master
-  #       with:
-  #         MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_WEBHOOK_URL }}
-  #         TEXT: |
-  #           #### :red_circle: Archive PDF URLs for ${{inputs.doi}} has failed
-  #           @channel please review the [workflow run](${{ env.WORKFLOW_URL }})
+  report-pdf-archiving-failure:
+    runs-on: ubuntu-latest
+    needs: archive-pdf-urls
+    if: failure()
+    steps:
+      - uses: mattermost/action-mattermost-notify@master
+        with:
+          MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_WEBHOOK_URL }}
+          TEXT: |
+            #### :red_circle: Archive PDF URLs for ${{inputs.doi}} has failed
+            @channel please review the [workflow run](${{ env.WORKFLOW_URL }})
 
