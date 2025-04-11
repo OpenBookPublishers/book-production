@@ -93,7 +93,7 @@ jobs:
         with:
           name: original-pdf
       - name: Run archive-pdf-urls Rust script
-        run: archive-pdf-urls obp.${{ inputs.doi }}.pdf --exclude https://doi.org/10.11647/OBP.${{ inputs.doi }}\*
+        run: archive-pdf-urls obp.${{ inputs.doi }}.pdf --exclude https://doi.org/\*
 
   chapter-splitter:
     needs: download-pdf
