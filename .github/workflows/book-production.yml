@@ -214,6 +214,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: HTML
+          path: ${{ env.WORK_DIR }}
       - name: Run Python Command
         working-directory: ${{ env.WORK_DIR }}
         run: |
