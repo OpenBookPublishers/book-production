@@ -210,10 +210,14 @@ jobs:
     env:
       WORK_DIR: /home/obp/cit-ex/
     steps:
+      - name: Retrieve Data
+        uses: actions/download-artifact@v4
+        with:
+          name: HTML
       - name: Run Python Command
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          python3 obp-loader.py 10.11647/obp.${{ inputs.doi }}
+          python3 obp-loader.py --html-path . 10.11647/obp.${{ inputs.doi }}
         env:
           THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
           THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
