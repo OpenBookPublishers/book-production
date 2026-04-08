@@ -118,8 +118,7 @@ jobs:
           --write-urls \
           10.11647/obp.${{ inputs.doi }}
         env:
-          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
-          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+          THOTH_PAT: ${{ secrets.THOTH_PAT }}
           COPYRIGHT_PAGE: ${{ inputs.copyright_page }}
       - name: Save Data
         uses: actions/upload-artifact@v4
@@ -152,8 +151,7 @@ jobs:
           MATHJAX: 'False'
           PRIVACYPOLICY_URL: 'https://www.openbookpublishers.com/policies/privacy/'
           OUTDIR: ${{ env.OUT_DIR }}
-          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
-          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+          THOTH_PAT: ${{ secrets.THOTH_PAT }}
       - name: Save Data
         uses: actions/upload-artifact@v4
         with:
@@ -220,8 +218,8 @@ jobs:
         run: |
           python3 obp-loader.py --html-path . 10.11647/obp.${{ inputs.doi }}
         env:
-          THOTH_EMAIL: ${{ secrets.THOTH_EMAIL }}
-          THOTH_PWD: ${{ secrets.THOTH_PASSWORD }}
+          THOTH_PAT: ${{ secrets.THOTH_PAT }}
+          CROSSREF_EMAIL: ${{ secrets.CROSSREF_EMAIL }}
 
   status:
     runs-on: ubuntu-latest
@@ -303,4 +301,3 @@ jobs:
           TEXT: |
             #### :red_circle: Archive PDF URLs for ${{inputs.doi}} has failed
             @channel please review the [workflow run](${{ env.WORKFLOW_URL }})
-
